@@ -1,0 +1,77 @@
+plugins {
+    id 'java'
+    id 'com.adarshr.test-logger' version '1.6.0'
+    id 'com.novoda.static-analysis' version '1.2'
+    id "com.github.spacialcircumstances.gradle-cucumber-reporting" version "0.1.6"
+}
+
+sourceCompatibility = 1.8
+
+repositories {
+    jcenter()
+    mavenCentral()
+}
+
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation 'io.github.cdimascio:java-dotenv:5.0.1'
+    implementation 'com.epam.reportportal:agent-java-cucumber:4.0.2'
+    testImplementation 'io.cucumber:cucumber-java8:4.7.1'
+    testImplementation 'io.cucumber:cucumber-junit:4.7.1'
+    testImplementation 'com.squareup.retrofit2:retrofit:2.4.0'
+    testImplementation 'io.rest-assured:rest-assured:3.3.0'
+}
+
+staticAnalysis {
+    penalty {
+        maxErrors = 0
+        maxWarnings = 0
+    }
+    pmd {
+        toolVersion '6.26.0'
+        incrementalAnalysis = true
+        ruleSetFiles = project.files("checker/pmd-rules.xml")
+        ruleSets = []
+        rulePriority = 3
+    }
+    findbugs {
+        exclude project.file('src/test/java/bukalapak/TestInstrument.java')
+    }
+}
+
+clean.doFirst {
+    delete "${rootDir}/out"
+    delete "${rootDir}/logs"
+    delete "${rootDir}/target"
+}
+
+testlogger {
+    theme 'mocha'
+    showExceptions true
+}
+
+test {
+    systemProperties = System.properties
+}
+
+cucumberReports {
+    outputDir = file('target/')
+    buildId = '0'
+    reports = files('target/cucumber-report.json')
+}
+
+task rerunCucumber() {
+    doLast {
+        javaexec {
+            systemProperties = System.properties
+            main = "cucumber.api.cli.Main"
+            classpath = configurations.testRuntimeClasspath + sourceSets.main.output + sourceSets.test.output
+            args = ['@rerun/failed_scenarios.txt',
+                    '--plugin', 'pretty',
+                    '--plugin', 'json:target/cucumber-report.json',
+                    '--plugin', 'rerun:rerun/failed_scenarios.txt',
+                    '--glue', 'bukalapak'
+            ]
+        }
+    }
+}
